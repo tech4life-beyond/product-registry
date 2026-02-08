@@ -2,7 +2,8 @@
 
 **Product ID:** T4L-TOIL-001-CDD  
 **Product Name:** Clean Drain Device  
-**Alternate Name:** DrainClean T Adapter  
+**Aliases:** DrainClean T Adapter  
+**Legacy IDs:** T4L-2025-001  
 **TOIL Version:** v1.0  
 **Initial Registration Date:** 2026-02-01  
 

@@ -2,7 +2,8 @@
 
 **Product ID:** T4L-TOIL-XXX  
 **Product Name:**  
-**Alternate Name (if any):**  
+**Aliases (Optional):**  
+**Legacy IDs (Optional):**  
 **TOIL Version:** v1.0  
 **Initial Registration Date:** YYYY-MM-DD  
 
