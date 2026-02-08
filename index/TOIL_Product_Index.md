@@ -43,15 +43,16 @@ Each indexed item is governed by:
 
 Each product is assigned a **unique TOIL Product ID** using the following format:
 
-**T4L-YYYY-XXX**
+**T4L-TOIL-###-SLUG**
 
 Where:
 - **T4L** = Tech4Life & Beyond
-- **YYYY** = Year of TOIL registration
-- **XXX** = Sequential product number
+- **TOIL** = Tech4Life Open Impact License
+- **###** = Sequential product number (zero-padded)
+- **SLUG** = Short, uppercase product slug
 
 Example:
-- **T4L-2025-001**
+- **T4L-TOIL-001-CDD**
 
 This ID must appear in:
 - TOIL Registration Record
@@ -66,9 +67,9 @@ This ID must appear in:
 
 ### Active Products
 
-| TOIL ID | Product Name | Category | Lead Creator | Status | License State |
-|-------|-------------|----------|--------------|--------|---------------|
-| T4L-2025-001 | Clean Drain Device | HVAC Hardware | Ariel Martin | Active | Open for Licensing |
+| TOIL ID | Product Name | Category | Lead Creator | Status | License State | Aliases (Optional) | Legacy IDs (Optional) |
+|-------|-------------|----------|--------------|--------|---------------|-------------------|-----------------------|
+| T4L-TOIL-001-CDD | Clean Drain Device | HVAC Hardware | Ariel Martin | Active | Open for Licensing | DrainClean T Adapter | T4L-2025-001 |
 
 ---
 
@@ -112,11 +113,14 @@ For each product, traceability is established through:
 - GitHub commit timestamps
 - Internal document versioning
 - TOIL Product ID consistency
+- The matching record stored in `records/` under the same TOIL ID
 
 This ensures:
 - Prior art protection
 - Clear ownership attribution
 - Legal defensibility under license law
+
+Each TOIL Registration Record in `records/` must match a row in this index by TOIL ID.
 
 ---
 
@@ -146,4 +150,3 @@ All products listed in this index are governed by the Tech4Life Open Impact Lice
 ---
 
 **End of Document**
-
