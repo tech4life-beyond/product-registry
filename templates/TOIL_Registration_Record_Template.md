@@ -1,8 +1,9 @@
 # TOIL Registration Record
 
-**Product ID:** T4L-TOIL-XXX  
+**Product ID:** T4L-TOIL-###-SLUG  
 **Product Name:**  
-**Alternate Name (if any):**  
+**Aliases (Optional):**  
+**Legacy IDs (Optional):**  
 **TOIL Version:** v1.0  
 **Initial Registration Date:** YYYY-MM-DD  
 
@@ -115,7 +116,7 @@ This document is part of the Tech4Life public registry.
 
 - Timestamped upon publication
 - Version-controlled via GitHub
-- Linked in the official Product Index
+- Linked in the official Product Index by TOIL ID
 
 This record establishes clear origin, authorship, and licensing conditions.
 
