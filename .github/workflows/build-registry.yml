@@ -1,0 +1,25 @@
+name: Build registry from products
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-registry:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Build registry artifacts
+        run: python tools/build_registry_from_products.py
+
+      - name: Check for uncommitted changes
+        run: git diff --exit-code exports/product_index.json index/TOIL_Product_Index.md
