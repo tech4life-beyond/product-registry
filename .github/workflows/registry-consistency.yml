@@ -24,8 +24,8 @@ jobs:
       - name: Fetch validator and rules
         run: |
           mkdir -p tools rules
-          curl -sSL https://raw.githubusercontent.com/tech4life-beyond/product-creation-pipeline/main/tools/t4l_validate_pack.py -o tools/t4l_validate_pack.py
-          curl -sSL https://raw.githubusercontent.com/tech4life-beyond/product-creation-pipeline/main/rules/product_pack_rules.yml -o rules/product_pack_rules.yml
+          curl -sSL https://raw.githubusercontent.com/tech4life-beyond/product-creation-pipeline/v1.0.0/tools/t4l_validate_pack.py -o tools/t4l_validate_pack.py
+          curl -sSL https://raw.githubusercontent.com/tech4life-beyond/product-creation-pipeline/v1.0.0/rules/product_pack_rules.yml -o rules/product_pack_rules.yml
 
       - name: Run validator
         run: python tools/t4l_validate_pack.py .
