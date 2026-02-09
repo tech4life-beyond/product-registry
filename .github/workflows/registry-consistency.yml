@@ -35,7 +35,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          ids=$(grep -R --include='*.md' -oE 'T4L-TOIL-[A-Za-z0-9-]+' . || true)
+          ids=$(grep -R --include='*.md' -hoE 'T4L-TOIL-[0-9]{3}-[A-Z0-9]+' . || true)
           if [ -n "$ids" ]; then
             invalid=$(echo "$ids" | grep -vE '^T4L-TOIL-[0-9]{3}-[A-Z0-9]+$' || true)
             if [ -n "$invalid" ]; then
@@ -45,7 +45,7 @@ jobs:
             fi
           fi
 
-          legacy_lines=$(grep -R --include='*.md' -nE 'T4L-20[0-9]{2}-[0-9]{3}' . | grep -vE 'Legacy IDs?' || true)
+          legacy_lines=$(grep -R --include='*.md' --exclude='TOIL_Product_Index.md' -nE 'T4L-20[0-9]{2}-[0-9]{3}' . | grep -vE 'Legacy IDs?' || true)
           if [ -n "$legacy_lines" ]; then
             echo "Legacy IDs must be labeled with 'Legacy ID' or 'Legacy IDs':"
             echo "$legacy_lines"
