@@ -14,7 +14,7 @@
 Original Inventor: Ariel Martin  
 Entity: Tech4Life & Beyond LLC (Florida, USA)
 
-This product is created, published, and governed under the Tech4Life Open Impact License (TOIL).
+This product is created, published, and governed under the Tech4Life Open Impact License (TOIL) v1.0.
 
 All rights are licensed, not sold.
 
