@@ -130,11 +130,60 @@ def write_json(products: List[Dict[str, object]], output_path: Path) -> None:
     )
 
 
-def build_registry(products_repo: Path, json_output: Path) -> None:
+def build_markdown_table(products: List[Dict[str, object]]) -> str:
+    header = (
+        "| TOIL ID | Product Name | Category | Lead Creator | Status | License State | "
+        "Aliases (Optional) | Legacy IDs (Optional) |"
+    )
+    separator = (
+        "|-------|-------------|----------|--------------|--------|---------------|"
+        "-------------------|-----------------------|"
+    )
+    rows = []
+    for product in products:
+        aliases = ", ".join(product.get("aliases", [])) if product.get("aliases") else ""
+        legacy_ids = ", ".join(product.get("legacy_ids", [])) if product.get("legacy_ids") else ""
+        rows.append(
+            "| {toil_id} | {product_name} | {category} | {lead_creator} | {status} | "
+            "{license_state} | {aliases} | {legacy_ids} |".format(
+                toil_id=product.get("toil_id", ""),
+                product_name=product.get("product_name", ""),
+                category=product.get("category", ""),
+                lead_creator=product.get("lead_creator", ""),
+                status=product.get("status", ""),
+                license_state=product.get("license_state", ""),
+                aliases=aliases,
+                legacy_ids=legacy_ids,
+            )
+        )
+    return "\n".join([header, separator, *rows]) + "\n"
+
+
+def write_markdown_index(products: List[Dict[str, object]], output_path: Path) -> None:
+    marker = "<!-- AUTO-GENERATED: PRODUCT INDEX TABLE (DO NOT EDIT BELOW) -->"
+    table = build_markdown_table(products)
+    if output_path.exists():
+        content = output_path.read_text(encoding="utf-8")
+    else:
+        content = ""
+
+    if marker in content:
+        prefix, _ = content.split(marker, 1)
+        prefix = prefix.rstrip()
+    else:
+        prefix = content.rstrip()
+
+    updated = prefix + ("\n\n" if prefix else "") + marker + "\n\n" + table
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(updated, encoding="utf-8")
+
+
+def build_registry(products_repo: Path, json_output: Path, markdown_output: Path) -> None:
     packs = discover_product_packs(products_repo)
     products = [parse_product_pack(pack) for pack in packs]
     products.sort(key=lambda item: str(item.get("toil_id", "")))
     write_json(products, json_output)
+    write_markdown_index(products, markdown_output)
 
 
 def main() -> None:
@@ -150,10 +199,16 @@ def main() -> None:
         default=Path("exports/product_index.json"),
         help="Path to write the product index JSON export.",
     )
+    parser.add_argument(
+        "--markdown-output",
+        type=Path,
+        default=Path("index/TOIL_Product_Index.md"),
+        help="Path to write the product index markdown file.",
+    )
     args = parser.parse_args()
 
     products_repo = ensure_products_repo(args.products)
-    build_registry(products_repo, args.json_output)
+    build_registry(products_repo, args.json_output, args.markdown_output)
 
 
 if __name__ == "__main__":

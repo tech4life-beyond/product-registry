@@ -10,10 +10,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Checkout products
+        uses: actions/checkout@v4
+        with:
+          repository: tech4life-beyond/products
+          path: products
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
       - name: Build registry artifacts
-        run: python tools/build_registry_from_products.py
+        run: |
+          python tools/build_registry_from_products.py --products products
+          git diff --exit-code exports/product_index.json index/TOIL_Product_Index.md
