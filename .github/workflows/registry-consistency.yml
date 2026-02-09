@@ -35,7 +35,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          ids=$(grep -R --include='*.md' -oE 'T4L-TOIL-[A-Za-z0-9-]+' . || true)
+          ids=$(grep -Rho --include='*.md' -E 'T4L-TOIL-[A-Za-z0-9-]+' . | sort -u || true)
           if [ -n "$ids" ]; then
             invalid=$(echo "$ids" | grep -vE '^T4L-TOIL-[0-9]{3}-[A-Z0-9]+$' || true)
             if [ -n "$invalid" ]; then
