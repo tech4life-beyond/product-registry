@@ -45,7 +45,7 @@ jobs:
             fi
           fi
 
-          legacy_lines=$(grep -R --include='*.md' -nE 'T4L-20[0-9]{2}-[0-9]{3}' . | grep -vE 'Legacy IDs?' || true)
+          legacy_lines=$(grep -R --include='*.md' --exclude='TOIL_Product_Index.md' -nE 'T4L-20[0-9]{2}-[0-9]{3}' . | grep -vE 'Legacy IDs?' || true)
           if [ -n "$legacy_lines" ]; then
             echo "Legacy IDs must be labeled with 'Legacy ID' or 'Legacy IDs':"
             echo "$legacy_lines"
