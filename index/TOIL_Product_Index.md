@@ -1,7 +1,7 @@
 # TOIL Product Index v1.0
 
 **Company:** Tech4Life & Beyond LLC  
-**Framework:** Tech4Life Open Impact License (TOIL)  
+**Framework:** Tech4Life Open Impact License (TOIL) v1.0  
 **Document Type:** Master Product Registry  
 **Visibility:** Internal (Public-facing excerpts allowed)  
 **Version:** 1.0
@@ -33,7 +33,7 @@ This index applies to:
 - Certified frameworks released under TOIL
 
 Each indexed item is governed by:
-- TOIL License
+- Tech4Life Open Impact License (TOIL) v1.0
 - Associated Product Pack documentation
 - Applicable collaboration and royalty agreements
 
@@ -47,7 +47,7 @@ Each product is assigned a **unique TOIL Product ID** using the following format
 
 Where:
 - **T4L** = Tech4Life & Beyond
-- **TOIL** = Tech4Life Open Impact License
+- **TOIL** = Tech4Life Open Impact License (TOIL) v1.0
 - **###** = Sequential product number (zero-padded)
 - **SLUG** = Short, uppercase product slug
 
@@ -146,7 +146,7 @@ Limited, non-sensitive excerpts may be made public for transparency and trust-bu
 
 ## 10. Legal Notice
 
-All products listed in this index are governed by the Tech4Life Open Impact License (TOIL). Commercial use requires a separate royalty agreement with Tech4Life & Beyond LLC.
+All products listed in this index are governed by the Tech4Life Open Impact License (TOIL) v1.0. Commercial use requires a separate royalty agreement with Tech4Life & Beyond LLC.
 
 ---
 
