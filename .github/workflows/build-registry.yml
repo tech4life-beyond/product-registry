@@ -2,6 +2,9 @@ name: Build registry from products
 
 on:
   workflow_dispatch:
+  repository_dispatch:
+    types: [sync_from_products]
+
 
 jobs:
   build-registry:
