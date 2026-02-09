@@ -1,0 +1,16 @@
+[
+  {
+    "toil_id": "T4L-TOIL-001-CDD",
+    "product_name": "Clean Drain Device",
+    "category": "HVAC Hardware",
+    "lead_creator": "Ariel Martin",
+    "status": "Active",
+    "license_state": "Open for Licensing",
+    "aliases": [
+      "DrainClean T Adapter"
+    ],
+    "legacy_ids": [
+      "T4L-2025-001"
+    ]
+  }
+]

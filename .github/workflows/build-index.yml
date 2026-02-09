@@ -1,0 +1,25 @@
+name: Build product index
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-index:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Build product index export
+        run: python tools/build_product_index.py
+
+      - name: Check for uncommitted changes
+        run: git diff --exit-code exports/product_index.json
