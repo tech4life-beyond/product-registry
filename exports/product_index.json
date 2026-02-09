@@ -12,5 +12,13 @@
     "legacy_ids": [
       "T4L-2025-001"
     ]
+  },
+  {
+    "toil_id": "T4L-TOIL-002-KIVAI",
+    "product_name": "Kivai",
+    "category": "Platform / Software",
+    "lead_creator": "Ariel Martin",
+    "status": "Active",
+    "license_state": "Open for Licensing"
   }
 ]
