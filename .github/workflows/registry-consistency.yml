@@ -1,0 +1,60 @@
+name: Registry consistency
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  registry-consistency:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install pyyaml
+
+      - name: Fetch validator and rules
+        run: |
+          mkdir -p tools rules
+          curl -sSL https://raw.githubusercontent.com/tech4life-beyond/product-creation-pipeline/main/tools/t4l_validate_pack.py -o tools/t4l_validate_pack.py
+          curl -sSL https://raw.githubusercontent.com/tech4life-beyond/product-creation-pipeline/main/rules/product_pack_rules.yml -o rules/product_pack_rules.yml
+
+      - name: Run validator
+        run: python tools/t4l_validate_pack.py .
+
+      - name: Validate IDs and dates in markdown
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ids=$(grep -R --include='*.md' -oE 'T4L-TOIL-[A-Za-z0-9-]+' . || true)
+          if [ -n "$ids" ]; then
+            invalid=$(echo "$ids" | grep -vE '^T4L-TOIL-[0-9]{3}-[A-Z0-9]+$' || true)
+            if [ -n "$invalid" ]; then
+              echo "Invalid Product IDs detected:"
+              echo "$invalid"
+              exit 1
+            fi
+          fi
+
+          legacy_lines=$(grep -R --include='*.md' -nE 'T4L-20[0-9]{2}-[0-9]{3}' . | grep -vE 'Legacy IDs?' || true)
+          if [ -n "$legacy_lines" ]; then
+            echo "Legacy IDs must be labeled with 'Legacy ID' or 'Legacy IDs':"
+            echo "$legacy_lines"
+            exit 1
+          fi
+
+          date_lines=$(grep -R --include='*.md' -nE '([0-9]{4}/[0-9]{2}/[0-9]{2})|([0-9]{2}-[0-9]{2}-[0-9]{4})' . || true)
+          if [ -n "$date_lines" ]; then
+            echo "Disallowed date formats detected (use YYYY-MM-DD):"
+            echo "$date_lines"
+            exit 1
+          fi
