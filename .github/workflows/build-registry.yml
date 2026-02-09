@@ -22,4 +22,4 @@ jobs:
         run: python tools/build_registry_from_products.py
 
       - name: Check for uncommitted changes
-        run: git diff --exit-code exports/product_index.json index/TOIL_Product_Index.md
+        run: git diff --exit-code exports/product_index.json
