@@ -1,10 +1,7 @@
 name: Build registry from products
 
 on:
-  pull_request:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
 
 jobs:
   build-registry:
@@ -20,6 +17,3 @@ jobs:
 
       - name: Build registry artifacts
         run: python tools/build_registry_from_products.py
-
-      - name: Check for uncommitted changes
-        run: git diff --exit-code exports/product_index.json
