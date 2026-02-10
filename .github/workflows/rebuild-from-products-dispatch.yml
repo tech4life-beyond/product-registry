@@ -2,7 +2,7 @@ name: Rebuild registry from products dispatch
 
 on:
   repository_dispatch:
-    types: [products_updated]
+    types: [sync_from_products]
 
 jobs:
   rebuild-registry:
