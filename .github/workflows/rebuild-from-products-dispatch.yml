@@ -3,6 +3,10 @@ name: Rebuild registry from products dispatch
 on:
   repository_dispatch:
     types: [sync_from_products]
+    
+permissions:
+  contents: write
+  pull-requests: write    
 
 jobs:
   rebuild-registry:
