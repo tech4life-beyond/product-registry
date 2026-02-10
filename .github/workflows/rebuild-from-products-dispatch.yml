@@ -1,0 +1,51 @@
+name: Rebuild registry from products dispatch
+
+on:
+  repository_dispatch:
+    types: [products_updated]
+
+jobs:
+  rebuild-registry:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout product-registry
+        uses: actions/checkout@v4
+
+      - name: Checkout products
+        uses: actions/checkout@v4
+        with:
+          repository: tech4life-beyond/products
+          path: products
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Build registry artifacts
+        run: |
+          python tools/build_registry_from_products.py --products products
+
+      - name: Check for changes
+        id: changes
+        run: |
+          if git diff --quiet -- exports/product_index.json index/TOIL_Product_Index.md; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create pull request
+        if: steps.changes.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: Sync registry from products
+          title: Sync registry from products
+          body: |
+            Source repo: ${{ github.event.client_payload.repo || 'N/A' }}
+            Source sha: ${{ github.event.client_payload.sha || 'N/A' }}
+            Source ref: ${{ github.event.client_payload.ref || 'N/A' }}
+          branch: sync-products-${{ github.run_id }}
+          add-paths: |
+            exports/product_index.json
+            index/TOIL_Product_Index.md
