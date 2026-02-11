@@ -2,6 +2,7 @@ name: Build registry from products
 
 on:
   workflow_dispatch:
+  pull_request:
   repository_dispatch:
     types: [sync_from_products]
 
