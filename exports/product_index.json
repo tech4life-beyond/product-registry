@@ -1,24 +1,18 @@
 [
   {
-    "toil_id": "T4L-TOIL-001-CDD",
-    "product_name": "Clean Drain Device",
     "category": "HVAC Hardware",
     "lead_creator": "Ariel Martin",
-    "status": "Active",
     "license_state": "Open for Licensing",
-    "aliases": [
-      "DrainClean T Adapter"
-    ],
-    "legacy_ids": [
-      "T4L-2025-001"
-    ]
+    "product_name": "Clean Drain Device",
+    "status": "Active",
+    "toil_id": "T4L-TOIL-001-CDD"
   },
   {
-    "toil_id": "T4L-TOIL-002-KIVAI",
-    "product_name": "Kivai",
     "category": "Platform / Software",
     "lead_creator": "Ariel Martin",
+    "license_state": "Open for Licensing",
+    "product_name": "Kivai",
     "status": "Active",
-    "license_state": "Open for Licensing"
+    "toil_id": "T4L-TOIL-002-KIVAI"
   }
 ]
