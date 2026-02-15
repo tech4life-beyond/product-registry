@@ -1,215 +1,282 @@
 #!/usr/bin/env python3
-"""Build registry index artifacts from the Tech4Life products repository."""
+"""Sync helper: build registry artifacts from a local checkout of the `products` repo.
+
+IMPORTANT GOVERNANCE NOTE
+-------------------------
+`index/TOIL_Product_Index.md` and `records/*.md` are the canonical sources of truth for this repo.
+
+This script is intentionally *non-destructive*:
+  - It generates candidate exports and a candidate markdown table for review.
+  - It does NOT write into `index/TOIL_Product_Index.md`.
+
+Typical use:
+  python3 tools/build_registry_from_products.py --products ../products
+
+Outputs:
+  - exports/product_index.json            (legacy)
+  - exports/product_index_v1.json         (schema v1)
+  - exports/products_candidate_index_table.md  (candidate table for reviewers)
+"""
+
 from __future__ import annotations
 
 import argparse
 import json
 import re
-import subprocess
-import tempfile
+import sys
+from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List
-
-TOIL_ID_PATTERN = re.compile(r"T4L-TOIL-\d{3}-[A-Z0-9]+")
-
-METADATA_KEYS = {
-    "product name": "product_name",
-    "category": "category",
-    "lead creator": "lead_creator",
-    "status": "status",
-    "license state": "license_state",
-    "aliases": "aliases",
-    "legacy ids": "legacy_ids",
-}
-
-DEFAULTS = {
-    "lead_creator": "Ariel Martin",
-    "status": "Active",
-    "license_state": "Open for Licensing",
-}
+from typing import Dict, List, Optional
 
 
-def run_git(args: List[str], cwd: Path) -> None:
-    subprocess.run(["git", *args], cwd=cwd, check=True)
+ROOT = Path(__file__).resolve().parents[1]
+EXPORTS = ROOT / "exports"
+RECORDS = ROOT / "records"
 
 
-def ensure_products_repo(explicit_path: Path | None) -> Path:
-    if explicit_path is not None:
-        return explicit_path
-
-    sibling_repo = Path("..") / "products"
-    if sibling_repo.exists():
-        return sibling_repo
-
-    temp_dir = Path(tempfile.mkdtemp(prefix="t4l-products-"))
-    run_git([
-        "clone",
-        "--depth",
-        "1",
-        "https://github.com/tech4life-beyond/products.git",
-        str(temp_dir),
-    ], cwd=Path("."))
-    return temp_dir
+# Strict, anchored TOIL id pattern used across the registry.
+TOIL_ID_RE = re.compile(r"\bT4L-TOIL-\d{3}-[A-Z0-9]+\b")
 
 
-def extract_metadata(lines: List[str]) -> Dict[str, str | List[str]]:
-    metadata: Dict[str, str | List[str]] = {}
-    for line in lines:
-        match = re.match(r"^\s*[-*]?\s*([^:]+)\s*:\s*(.+)$", line)
-        if not match:
-            continue
-        key = match.group(1).strip().lower()
-        value = match.group(2).strip()
-        if key not in METADATA_KEYS:
-            continue
-        field = METADATA_KEYS[key]
-        if field in {"aliases", "legacy_ids"}:
-            items = [item.strip() for item in value.split(",")]
-            metadata[field] = [item for item in items if item]
-        else:
-            metadata[field] = value
-    return metadata
+@dataclass(frozen=True)
+class ProductCandidate:
+    toil_id: str
+    product_name: str
+    status: str
+    license_state: str
+    primary_owner: str
+    category: Optional[str] = None
+    lead_creator: Optional[str] = None
+    aliases: Optional[List[str]] = None
+    legacy_ids: Optional[List[str]] = None
 
 
-def title_case_folder(name: str) -> str:
-    return name.replace("-", " ").replace("_", " ").title()
+def _read_text(p: Path) -> str:
+    return p.read_text(encoding="utf-8")
 
 
-def parse_product_pack(pack_dir: Path) -> Dict[str, object]:
-    readme_path = pack_dir / "README.md"
-    content = readme_path.read_text(encoding="utf-8")
-    toil_matches = TOIL_ID_PATTERN.findall(content)
-    if not toil_matches:
-        raise ValueError(f"No TOIL ID found in {readme_path}")
-    toil_id = toil_matches[0]
-
-    lines = content.splitlines()
-    metadata = extract_metadata(lines)
-
-    product_name = metadata.get("product_name") or title_case_folder(pack_dir.name)
-    category = metadata.get("category") or ""
-    lead_creator = metadata.get("lead_creator") or DEFAULTS["lead_creator"]
-    status = metadata.get("status") or DEFAULTS["status"]
-    license_state = metadata.get("license_state") or DEFAULTS["license_state"]
-
-    product: Dict[str, object] = {
-        "toil_id": toil_id,
-        "product_name": product_name,
-        "category": category,
-        "lead_creator": lead_creator,
-        "status": status,
-        "license_state": license_state,
-    }
-
-    aliases = metadata.get("aliases")
-    if aliases:
-        product["aliases"] = aliases
-
-    legacy_ids = metadata.get("legacy_ids")
-    if legacy_ids:
-        product["legacy_ids"] = legacy_ids
-
-    return product
+def _extract_toil_id_from_readme(readme_text: str, repo_path: Path) -> str:
+    matches = TOIL_ID_RE.findall(readme_text)
+    matches = list(dict.fromkeys(matches))  # stable de-dupe
+    if len(matches) == 0:
+        raise SystemExit(f"ERROR: No TOIL ID found in {repo_path}/README.md")
+    if len(matches) > 1:
+        raise SystemExit(
+            f"ERROR: Multiple TOIL IDs found in {repo_path}/README.md: {', '.join(matches)}"
+        )
+    return matches[0]
 
 
-def discover_product_packs(products_repo: Path) -> List[Path]:
-    packs: List[Path] = []
-    for entry in sorted(products_repo.iterdir()):
-        if not entry.is_dir():
-            continue
-        if (entry / "README.md").exists():
-            packs.append(entry)
+def _split_csv(cell: str) -> Optional[List[str]]:
+    parts = [p.strip() for p in cell.split(",") if p.strip()]
+    return parts or None
+
+
+def _load_pack_metadata(repo_path: Path) -> Dict[str, str]:
+    """Best-effort metadata extraction.
+
+    We keep this intentionally conservative: if a field is missing, we don't invent it.
+    """
+    meta: Dict[str, str] = {}
+    # If the product pack has a metadata file, prefer it. Otherwise fall back to README headings.
+    md = repo_path / "metadata.json"
+    if md.exists():
+        try:
+            meta_json = json.loads(_read_text(md))
+            for k in ("product_name", "status", "license_state", "primary_owner", "category", "lead_creator"):
+                v = meta_json.get(k)
+                if isinstance(v, str) and v.strip():
+                    meta[k] = v.strip()
+        except Exception:
+            # non-fatal; continue with README-based extraction
+            pass
+
+    return meta
+
+
+def _candidate_from_pack(pack_path: Path) -> ProductCandidate:
+    readme = pack_path / "README.md"
+    if not readme.exists():
+        raise SystemExit(f"ERROR: Missing README.md in product pack: {pack_path}")
+
+    toil_id = _extract_toil_id_from_readme(_read_text(readme), pack_path)
+    meta = _load_pack_metadata(pack_path)
+
+    product_name = meta.get("product_name") or pack_path.name
+    status = meta.get("status") or "Active"
+    license_state = meta.get("license_state") or "Open for Licensing"
+    primary_owner = meta.get("primary_owner") or "Tech4Life & Beyond LLC"
+
+    return ProductCandidate(
+        toil_id=toil_id,
+        product_name=product_name,
+        status=status,
+        license_state=license_state,
+        primary_owner=primary_owner,
+        category=meta.get("category"),
+        lead_creator=meta.get("lead_creator"),
+    )
+
+
+def _discover_product_packs(products_root: Path) -> List[Path]:
+    # A "product pack" is a folder with a README.md at its root.
+    packs = []
+    for p in sorted(products_root.iterdir()):
+        if p.is_dir() and (p / "README.md").exists():
+            packs.append(p)
     return packs
 
 
-def write_json(products: List[Dict[str, object]], output_path: Path) -> None:
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(
-        json.dumps(products, indent=2, ensure_ascii=False) + "\n",
+def _ensure_records_exist(candidates: List[ProductCandidate]) -> None:
+    missing = []
+    for c in candidates:
+        rec = RECORDS / f"{c.toil_id}.md"
+        if not rec.exists():
+            missing.append(c.toil_id)
+    if missing:
+        raise SystemExit(
+            "ERROR: Missing registry records for TOIL IDs: "
+            + ", ".join(missing)
+            + ". Create records/<TOIL_ID>.md before syncing exports."
+        )
+
+
+def _check_duplicate_toil_ids(candidates: List[ProductCandidate]) -> None:
+    seen: Dict[str, int] = {}
+    dups: List[str] = []
+    for c in candidates:
+        seen[c.toil_id] = seen.get(c.toil_id, 0) + 1
+    for k, v in seen.items():
+        if v > 1:
+            dups.append(k)
+    if dups:
+        raise SystemExit(f"ERROR: Duplicate TOIL IDs detected in products packs: {', '.join(dups)}")
+
+
+def _write_exports(candidates: List[ProductCandidate]) -> None:
+    EXPORTS.mkdir(parents=True, exist_ok=True)
+
+    legacy_items: List[Dict[str, object]] = []
+    for c in sorted(candidates, key=lambda x: x.toil_id):
+        item: Dict[str, object] = {
+            "toil_id": c.toil_id,
+            "product_name": c.product_name,
+            "status": c.status,
+            "license_state": c.license_state,
+            "primary_owner": c.primary_owner,
+        }
+        if c.aliases:
+            item["aliases"] = c.aliases
+        if c.legacy_ids:
+            item["legacy_ids"] = c.legacy_ids
+        legacy_items.append(item)
+
+    (EXPORTS / "product_index.json").write_text(
+        json.dumps(legacy_items, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    v1 = {
+        "schema_version": "v1",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "products": legacy_items,
+    }
+    (EXPORTS / "product_index_v1.json").write_text(
+        json.dumps(v1, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
 
 
-def build_markdown_table(products: List[Dict[str, object]]) -> str:
-    header = (
-        "| TOIL ID | Product Name | Category | Lead Creator | Status | License State | "
-        "Aliases (Optional) | Legacy IDs (Optional) |"
+def _write_candidate_table(candidates: List[ProductCandidate]) -> None:
+    out = EXPORTS / "products_candidate_index_table.md"
+    lines = []
+    lines.append("# Candidate Product Index Table (from products repo)")
+    lines.append("")
+    lines.append("This file is generated for review. It must be manually reconciled with index/TOIL_Product_Index.md.")
+    lines.append("")
+    lines.append(
+        "| TOIL ID | Product Name | Status | License State | Primary Owner | Aliases (Optional) | Legacy IDs (Optional) |"
     )
-    separator = (
-        "|-------|-------------|----------|--------------|--------|---------------|"
-        "-------------------|-----------------------|"
-    )
-    rows = []
-    for product in products:
-        aliases = ", ".join(product.get("aliases", [])) if product.get("aliases") else ""
-        legacy_ids = ", ".join(product.get("legacy_ids", [])) if product.get("legacy_ids") else ""
-        rows.append(
-            "| {toil_id} | {product_name} | {category} | {lead_creator} | {status} | "
-            "{license_state} | {aliases} | {legacy_ids} |".format(
-                toil_id=product.get("toil_id", ""),
-                product_name=product.get("product_name", ""),
-                category=product.get("category", ""),
-                lead_creator=product.get("lead_creator", ""),
-                status=product.get("status", ""),
-                license_state=product.get("license_state", ""),
-                aliases=aliases,
-                legacy_ids=legacy_ids,
+    lines.append("|---|---|---|---|---|---|---|")
+    for c in sorted(candidates, key=lambda x: x.toil_id):
+        lines.append(
+            "| "
+            + " | ".join(
+                [
+                    c.toil_id,
+                    c.product_name,
+                    c.status,
+                    c.license_state,
+                    c.primary_owner,
+                    ", ".join(c.aliases or []),
+                    ", ".join(c.legacy_ids or []),
+                ]
             )
+            + " |"
         )
-    return "\n".join([header, separator, *rows]) + "\n"
+    out.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def write_markdown_index(products: List[Dict[str, object]], output_path: Path) -> None:
-    marker = "<!-- AUTO-GENERATED: PRODUCT INDEX TABLE (DO NOT EDIT BELOW) -->"
-    table = build_markdown_table(products)
-    if output_path.exists():
-        content = output_path.read_text(encoding="utf-8")
-    else:
-        content = ""
-
-    if marker in content:
-        prefix, _ = content.split(marker, 1)
-        prefix = prefix.rstrip()
-    else:
-        prefix = content.rstrip()
-
-    updated = prefix + ("\n\n" if prefix else "") + marker + "\n\n" + table
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(updated, encoding="utf-8")
-
-
-def build_registry(products_repo: Path, json_output: Path, markdown_output: Path) -> None:
-    packs = discover_product_packs(products_repo)
-    products = [parse_product_pack(pack) for pack in packs]
-    products.sort(key=lambda item: str(item.get("toil_id", "")))
-    write_json(products, json_output)
-    write_markdown_index(products, markdown_output)
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Build registry from products repository.")
-    parser.add_argument(
-        "--products",
-        type=Path,
-        help="Path to the products repository. Defaults to ../products if present.",
+def main(argv: Optional[List[str]] = None) -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--products", required=True, help="Path to a local checkout of tech4life-beyond/products")
+    ap.add_argument(
+        "--check",
+        action="store_true",
+        help="Exit non-zero if generated exports would differ from committed exports.",
     )
-    parser.add_argument(
-        "--json-output",
-        type=Path,
-        default=Path("exports/product_index.json"),
-        help="Path to write the product index JSON export.",
-    )
-    parser.add_argument(
-        "--markdown-output",
-        type=Path,
-        default=Path("index/TOIL_Product_Index.md"),
-        help="Path to write the product index markdown file.",
-    )
-    args = parser.parse_args()
+    args = ap.parse_args(argv)
 
-    products_repo = ensure_products_repo(args.products)
-    build_registry(products_repo, args.json_output, args.markdown_output)
+    products_root = Path(args.products).resolve()
+    if not products_root.exists() or not products_root.is_dir():
+        raise SystemExit(f"ERROR: --products path does not exist or is not a directory: {products_root}")
+
+    packs = _discover_product_packs(products_root)
+    if not packs:
+        raise SystemExit(f"ERROR: No product packs found under: {products_root}")
+
+    candidates = [_candidate_from_pack(p) for p in packs]
+    _check_duplicate_toil_ids(candidates)
+    _ensure_records_exist(candidates)
+
+    # Write to a temp area first when in --check mode.
+    if args.check:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as td:
+            tmp_root = Path(td)
+            global EXPORTS
+            EXPORTS = tmp_root / "exports"
+            _write_exports(candidates)
+            _write_candidate_table(candidates)
+
+            diffs = []
+            for rel in [
+                "exports/product_index.json",
+                "exports/product_index_v1.json",
+                "exports/products_candidate_index_table.md",
+            ]:
+                a = ROOT / rel
+                b = tmp_root / rel
+                if not a.exists():
+                    diffs.append(rel)
+                    continue
+                if a.read_bytes() != b.read_bytes():
+                    diffs.append(rel)
+            if diffs:
+                print("ERROR: Generated artifacts differ from committed files:")
+                for d in diffs:
+                    print(f"- {d}")
+                return 4
+            print("OK: Products sync artifacts are up to date.")
+            return 0
+
+    _write_exports(candidates)
+    _write_candidate_table(candidates)
+    print("Wrote exports/product_index.json, exports/product_index_v1.json, exports/products_candidate_index_table.md")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

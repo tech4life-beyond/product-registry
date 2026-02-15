@@ -30,13 +30,18 @@ TOIL_ID_RE = re.compile(r"^T4L-TOIL-\d{3}(?:-[A-Z0-9]+)+$")
 
 def _parse_markdown_table(md_text: str) -> List[Dict[str, str]]:
     lines = md_text.splitlines()
-    header_idx = None
-    for i, line in enumerate(lines):
-        if re.search(r"\|\s*TOIL ID\s*\|", line):
-            header_idx = i
-            break
-    if header_idx is None:
+    header_idxs = [i for i, line in enumerate(lines) if re.search(r"\|\s*TOIL ID\s*\|", line)]
+    if not header_idxs:
         raise ValueError("Missing index table header")
+    if len(header_idxs) > 1:
+        locs = ", ".join(str(i + 1) for i in header_idxs)
+        raise ValueError(
+            "Multiple product index tables detected (headers at lines: "
+            + locs
+            + "). Keep exactly one canonical table in index/TOIL_Product_Index.md."
+        )
+
+    header_idx = header_idxs[0]
 
     header = [c.strip() for c in lines[header_idx].strip().strip("|").split("|")]
     rows: List[Dict[str, str]] = []
@@ -123,6 +128,35 @@ def main() -> None:
             errors.append(
                 "Legacy export does not match v1 products list (exports drift)"
             )
+
+    # Optional fields in the index must not be silently dropped in exports.
+    def _split_list(cell: str) -> List[str]:
+        return [p.strip() for p in cell.split(",") if p.strip()]
+
+    if isinstance(v1, dict) and isinstance(v1.get("products"), list):
+        exp_by_id = {
+            p.get("toil_id"): p
+            for p in v1["products"]
+            if isinstance(p, dict) and isinstance(p.get("toil_id"), str)
+        }
+        for r in rows:
+            tid = (r.get("TOIL ID") or "").strip()
+            exp = exp_by_id.get(tid)
+            if not exp:
+                continue
+            aliases_cell = (r.get("Aliases (Optional)") or r.get("Aliases") or "").strip()
+            legacy_cell = (r.get("Legacy IDs (Optional)") or r.get("Legacy IDs") or "").strip()
+            aliases = _split_list(aliases_cell)
+            legacy_ids = _split_list(legacy_cell)
+
+            if aliases and exp.get("aliases") != aliases:
+                errors.append(
+                    f"aliases differ for {tid}: index has {aliases!r} but export has {exp.get('aliases')!r}"
+                )
+            if legacy_ids and exp.get("legacy_ids") != legacy_ids:
+                errors.append(
+                    f"legacy_ids differ for {tid}: index has {legacy_ids!r} but export has {exp.get('legacy_ids')!r}"
+                )
 
     if errors:
         print("Registry validation failed:")

@@ -37,18 +37,39 @@ def _split_list(cell: str) -> List[str]:
 
 
 def _parse_markdown_table(md_text: str) -> List[Dict[str, str]]:
+    """Parse the *single* canonical product index table.
+
+    Enforcement:
+    - Exactly one index table must exist in index/TOIL_Product_Index.md.
+    - The table is identified by a header row containing "TOIL ID".
+    """
     lines = md_text.splitlines()
-    header_idx = None
+
+    def is_separator(line: str) -> bool:
+        s = line.replace("|", "").strip()
+        return bool(s) and set(s) <= set("-: ")
+
+    header_idxs = []
     for i, line in enumerate(lines):
         if re.search(r"\|\s*TOIL ID\s*\|", line):
-            header_idx = i
-            break
-    if header_idx is None:
+            # must be followed by a separator row
+            if i + 1 < len(lines) and is_separator(lines[i + 1]):
+                header_idxs.append(i)
+
+    if not header_idxs:
         raise SystemExit(
             f"ERROR: Could not find product index table header in {INDEX_MD.as_posix()}"
         )
+    if len(header_idxs) > 1:
+        locs = ", ".join(str(i + 1) for i in header_idxs)
+        raise SystemExit(
+            "ERROR: Multiple product index tables detected in index/TOIL_Product_Index.md "
+            f"(headers at lines: {locs}). Keep exactly one canonical table."
+        )
 
+    header_idx = header_idxs[0]
     header = [c.strip() for c in lines[header_idx].strip().strip("|").split("|")]
+
     required_cols = [
         "TOIL ID",
         "Product Name",
@@ -103,11 +124,12 @@ def _normalize_product(row: Dict[str, str]) -> Dict[str, object]:
         "license_state": row["License State"].strip(),
     }
 
-    aliases = _split_list(row.get("Aliases", ""))
+    # Optional columns may be present as legacy names or as "(Optional)" variants.
+    aliases = _split_list(row.get("Aliases (Optional)", "") or row.get("Aliases", ""))
     if aliases:
         item["aliases"] = aliases
 
-    legacy_ids = _split_list(row.get("Legacy IDs", ""))
+    legacy_ids = _split_list(row.get("Legacy IDs (Optional)", "") or row.get("Legacy IDs", ""))
     if legacy_ids:
         item["legacy_ids"] = legacy_ids
 

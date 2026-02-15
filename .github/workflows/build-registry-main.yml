@@ -1,0 +1,42 @@
+name: build-registry-main
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Build exports
+        run: python3 tools/build_product_index.py
+
+      - name: Validate registry integrity
+        run: python3 tools/validate_registry.py
+
+      - name: Validate export schema
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install jsonschema
+          python3 - <<'PY'
+          import json
+          from jsonschema import validate
+          from pathlib import Path
+          schema = json.loads(Path("schema/product_index_v1.schema.json").read_text(encoding="utf-8"))
+          data = json.loads(Path("exports/product_index_v1.json").read_text(encoding="utf-8"))
+          validate(instance=data, schema=schema)
+          print("Schema validation passed.")
+          PY
+
+      - name: Ensure exports are committed
+        run: git diff --exit-code .
