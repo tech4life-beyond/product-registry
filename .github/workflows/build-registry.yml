@@ -2,8 +2,6 @@ name: build-registry
 
 on:
   pull_request:
-  push:
-    branches: [main]
 
 jobs:
   build:
@@ -11,9 +9,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -41,4 +36,4 @@ jobs:
           PY
 
       - name: Ensure exports are committed
-        run: git diff --exit-code .
+        run: git diff --exit-code
