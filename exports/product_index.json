@@ -1,7 +1,13 @@
 [
   {
+    "aliases": [
+      "DrainClean T Adapter"
+    ],
     "category": "HVAC Hardware",
     "lead_creator": "Ariel Martin",
+    "legacy_ids": [
+      "T4L-2025-001"
+    ],
     "license_state": "Open for Licensing",
     "product_name": "Clean Drain Device",
     "status": "Active",

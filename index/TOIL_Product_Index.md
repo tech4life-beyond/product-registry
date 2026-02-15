@@ -151,10 +151,3 @@ All products listed in this index are governed by the Tech4Life Open Impact Lice
 ---
 
 **End of Document**
-
-<!-- AUTO-GENERATED: PRODUCT INDEX TABLE (DO NOT EDIT BELOW) -->
-
-| TOIL ID | Product Name | Category | Lead Creator | Status | License State | Aliases (Optional) | Legacy IDs (Optional) |
-|-------|-------------|----------|--------------|--------|---------------|-------------------|-----------------------|
-| T4L-TOIL-001-CDD | Clean Drain Device | HVAC Hardware | Ariel Martin | Active | Open for Licensing | DrainClean T Adapter | T4L-2025-001 |
-| T4L-TOIL-002-KIVAI | Kivai | Platform / Software | Ariel Martin | Active | Open for Licensing |  |  |

@@ -29,14 +29,34 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Install tooling
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install "jsonschema==4.23.0"
+
       - name: Build registry artifacts
         run: |
           python tools/build_registry_from_products.py --products products
 
+      - name: Validate registry integrity
+        run: python3 tools/validate_registry.py
+
+      - name: Validate export schema
+        run: |
+          python3 - <<'PY'
+          import json
+          from jsonschema import validate
+          from pathlib import Path
+          schema = json.loads(Path("schema/product_index_v1.schema.json").read_text(encoding="utf-8"))
+          data = json.loads(Path("exports/product_index_v1.json").read_text(encoding="utf-8"))
+          validate(instance=data, schema=schema)
+          print("Schema validation passed.")
+          PY
+
       - name: Check for changes
         id: changes
         run: |
-          if git diff --quiet -- exports/product_index.json index/TOIL_Product_Index.md; then
+          if git diff --quiet -- exports/product_index.json exports/product_index_v1.json exports/products_candidate_index_table.md; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
@@ -55,4 +75,5 @@ jobs:
           branch: sync-products-${{ github.run_id }}
           add-paths: |
             exports/product_index.json
-            index/TOIL_Product_Index.md
+            exports/product_index_v1.json
+            exports/products_candidate_index_table.md
