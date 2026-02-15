@@ -1,0 +1,21 @@
+{
+  "products": [
+    {
+      "category": "HVAC Hardware",
+      "lead_creator": "Ariel Martin",
+      "license_state": "Open for Licensing",
+      "product_name": "Clean Drain Device",
+      "status": "Active",
+      "toil_id": "T4L-TOIL-001-CDD"
+    },
+    {
+      "category": "Platform / Software",
+      "lead_creator": "Ariel Martin",
+      "license_state": "Open for Licensing",
+      "product_name": "Kivai",
+      "status": "Active",
+      "toil_id": "T4L-TOIL-002-KIVAI"
+    }
+  ],
+  "schema_version": "1.0.0"
+}
