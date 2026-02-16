@@ -25,7 +25,6 @@ import json
 import re
 import sys
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -36,7 +35,7 @@ RECORDS = ROOT / "records"
 
 
 # Strict, anchored TOIL id pattern used across the registry.
-TOIL_ID_RE = re.compile(r"\bT4L-TOIL-\d{3}-[A-Z0-9]+\b")
+TOIL_ID_RE = re.compile(r"\bT4L-TOIL-\d{3}(?:-[A-Z0-9]+)+\b")
 
 
 @dataclass(frozen=True)
@@ -45,9 +44,8 @@ class ProductCandidate:
     product_name: str
     status: str
     license_state: str
-    primary_owner: str
-    category: Optional[str] = None
-    lead_creator: Optional[str] = None
+    category: str
+    lead_creator: str
     aliases: Optional[List[str]] = None
     legacy_ids: Optional[List[str]] = None
 
@@ -84,10 +82,28 @@ def _load_pack_metadata(repo_path: Path) -> Dict[str, str]:
     if md.exists():
         try:
             meta_json = json.loads(_read_text(md))
-            for k in ("product_name", "status", "license_state", "primary_owner", "category", "lead_creator"):
+            for k in (
+                "product_name",
+                "status",
+                "license_state",
+                "category",
+                "lead_creator",
+            ):
                 v = meta_json.get(k)
                 if isinstance(v, str) and v.strip():
                     meta[k] = v.strip()
+
+            aliases = meta_json.get("aliases")
+            if isinstance(aliases, list) and all(
+                isinstance(v, str) and v.strip() for v in aliases
+            ):
+                meta["aliases"] = ",".join(v.strip() for v in aliases)
+
+            legacy_ids = meta_json.get("legacy_ids")
+            if isinstance(legacy_ids, list) and all(
+                isinstance(v, str) and v.strip() for v in legacy_ids
+            ):
+                meta["legacy_ids"] = ",".join(v.strip() for v in legacy_ids)
         except Exception:
             # non-fatal; continue with README-based extraction
             pass
@@ -106,16 +122,18 @@ def _candidate_from_pack(pack_path: Path) -> ProductCandidate:
     product_name = meta.get("product_name") or pack_path.name
     status = meta.get("status") or "Active"
     license_state = meta.get("license_state") or "Open for Licensing"
-    primary_owner = meta.get("primary_owner") or "Tech4Life & Beyond LLC"
+    category = meta.get("category") or "Uncategorized"
+    lead_creator = meta.get("lead_creator") or "Unknown"
 
     return ProductCandidate(
         toil_id=toil_id,
         product_name=product_name,
         status=status,
         license_state=license_state,
-        primary_owner=primary_owner,
-        category=meta.get("category"),
-        lead_creator=meta.get("lead_creator"),
+        category=category,
+        lead_creator=lead_creator,
+        aliases=_split_csv(meta.get("aliases", "")),
+        legacy_ids=_split_csv(meta.get("legacy_ids", "")),
     )
 
 
@@ -151,7 +169,9 @@ def _check_duplicate_toil_ids(candidates: List[ProductCandidate]) -> None:
         if v > 1:
             dups.append(k)
     if dups:
-        raise SystemExit(f"ERROR: Duplicate TOIL IDs detected in products packs: {', '.join(dups)}")
+        raise SystemExit(
+            f"ERROR: Duplicate TOIL IDs detected in products packs: {', '.join(dups)}"
+        )
 
 
 def _write_exports(candidates: List[ProductCandidate]) -> None:
@@ -162,9 +182,10 @@ def _write_exports(candidates: List[ProductCandidate]) -> None:
         item: Dict[str, object] = {
             "toil_id": c.toil_id,
             "product_name": c.product_name,
+            "category": c.category,
+            "lead_creator": c.lead_creator,
             "status": c.status,
             "license_state": c.license_state,
-            "primary_owner": c.primary_owner,
         }
         if c.aliases:
             item["aliases"] = c.aliases
@@ -178,8 +199,7 @@ def _write_exports(candidates: List[ProductCandidate]) -> None:
     )
 
     v1 = {
-        "schema_version": "v1",
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "schema_version": "1.0.0",
         "products": legacy_items,
     }
     (EXPORTS / "product_index_v1.json").write_text(
@@ -193,12 +213,14 @@ def _write_candidate_table(candidates: List[ProductCandidate]) -> None:
     lines = []
     lines.append("# Candidate Product Index Table (from products repo)")
     lines.append("")
-    lines.append("This file is generated for review. It must be manually reconciled with index/TOIL_Product_Index.md.")
+    lines.append(
+        "This file is generated for review. It must be manually reconciled with index/TOIL_Product_Index.md."
+    )
     lines.append("")
     lines.append(
-        "| TOIL ID | Product Name | Status | License State | Primary Owner | Aliases (Optional) | Legacy IDs (Optional) |"
+        "| TOIL ID | Product Name | Category | Lead Creator | Status | License State | Aliases (Optional) | Legacy IDs (Optional) |"
     )
-    lines.append("|---|---|---|---|---|---|---|")
+    lines.append("|---|---|---|---|---|---|---|---|")
     for c in sorted(candidates, key=lambda x: x.toil_id):
         lines.append(
             "| "
@@ -206,9 +228,10 @@ def _write_candidate_table(candidates: List[ProductCandidate]) -> None:
                 [
                     c.toil_id,
                     c.product_name,
+                    c.category,
+                    c.lead_creator,
                     c.status,
                     c.license_state,
-                    c.primary_owner,
                     ", ".join(c.aliases or []),
                     ", ".join(c.legacy_ids or []),
                 ]
@@ -220,7 +243,11 @@ def _write_candidate_table(candidates: List[ProductCandidate]) -> None:
 
 def main(argv: Optional[List[str]] = None) -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--products", required=True, help="Path to a local checkout of tech4life-beyond/products")
+    ap.add_argument(
+        "--products",
+        required=True,
+        help="Path to a local checkout of tech4life-beyond/products",
+    )
     ap.add_argument(
         "--check",
         action="store_true",
@@ -230,7 +257,9 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     products_root = Path(args.products).resolve()
     if not products_root.exists() or not products_root.is_dir():
-        raise SystemExit(f"ERROR: --products path does not exist or is not a directory: {products_root}")
+        raise SystemExit(
+            f"ERROR: --products path does not exist or is not a directory: {products_root}"
+        )
 
     packs = _discover_product_packs(products_root)
     if not packs:
@@ -274,7 +303,9 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     _write_exports(candidates)
     _write_candidate_table(candidates)
-    print("Wrote exports/product_index.json, exports/product_index_v1.json, exports/products_candidate_index_table.md")
+    print(
+        "Wrote exports/product_index.json, exports/product_index_v1.json, exports/products_candidate_index_table.md"
+    )
     return 0
 
 
