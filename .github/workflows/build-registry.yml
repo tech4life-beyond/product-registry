@@ -2,14 +2,19 @@ name: build-registry
 
 on:
   pull_request:
-  
+
 permissions:
   contents: read
-  statuses: write    
+  statuses: write
+
+concurrency:
+  group: build-registry-pr-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 15    
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -18,11 +23,15 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: pip
 
       - name: Install tooling
         run: |
           python3 -m pip install --upgrade pip
-          python3 -m pip install "jsonschema==4.23.0"
+          python3 -m pip install "jsonschema==4.23.0" "pytest==8.3.3"
+
+      - name: Run tests
+        run: pytest -q
 
       - name: Verify exports are up to date
         run: python3 tools/build_product_index.py --check
@@ -49,6 +58,7 @@ jobs:
     name: report-required-status
     runs-on: ubuntu-latest
     if: always()
+    timeout-minutes: 5
     needs: [build]
     steps:
       - name: Publish required status context
