@@ -30,7 +30,9 @@ TOIL_ID_RE = re.compile(r"^T4L-TOIL-\d{3}(?:-[A-Z0-9]+)+$")
 
 def _parse_markdown_table(md_text: str) -> List[Dict[str, str]]:
     lines = md_text.splitlines()
-    header_idxs = [i for i, line in enumerate(lines) if re.search(r"\|\s*TOIL ID\s*\|", line)]
+    header_idxs = [
+        i for i, line in enumerate(lines) if re.search(r"\|\s*TOIL ID\s*\|", line)
+    ]
     if not header_idxs:
         raise ValueError("Missing index table header")
     if len(header_idxs) > 1:
@@ -144,8 +146,12 @@ def main() -> None:
             exp = exp_by_id.get(tid)
             if not exp:
                 continue
-            aliases_cell = (r.get("Aliases (Optional)") or r.get("Aliases") or "").strip()
-            legacy_cell = (r.get("Legacy IDs (Optional)") or r.get("Legacy IDs") or "").strip()
+            aliases_cell = (
+                r.get("Aliases (Optional)") or r.get("Aliases") or ""
+            ).strip()
+            legacy_cell = (
+                r.get("Legacy IDs (Optional)") or r.get("Legacy IDs") or ""
+            ).strip()
             aliases = _split_list(aliases_cell)
             legacy_ids = _split_list(legacy_cell)
 
