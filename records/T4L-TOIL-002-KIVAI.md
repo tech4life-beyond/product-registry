@@ -24,22 +24,51 @@ All rights are licensed, not sold.
 
 ## 2. Problem Statement
 
-Product teams and community partners need a unified, ethical platform to publish, manage, and govern Tech4Life innovations with clear licensing, provenance, and collaboration workflows.
+Modern devices and AI systems are fragmented.
+
+Product teams, creators, and partners need a **unified, auditable interoperability layer** to translate high-level intents (human or AI) into **authorized actions** across many device types, protocols, and environments.
+
+Without a shared routing and authorization layer, device control becomes:
+
+- inconsistent
+- insecure
+- hard to scale
+- difficult to audit
 
 ---
 
 ## 3. Solution Overview
 
-Kivai is a platform/software system that provides structured product registry, documentation, and licensing workflows so Tech4Life innovations remain traceable, usable, and properly licensed.
+Kivai is an **interoperability gateway and intent routing layer** between AI systems (or user interfaces) and physical/digital devices.
+
+Kivai is:
+
+- **not** a chatbot or assistant
+- **not** a UI product
+- **not** a product registry
+
+Kivai is:
+
+- schema-first and deterministic
+- auditable and traceable
+- gateway-orchestrated
+- device-agnostic
+- designed to route canonical **Intent JSON** into authorized execution via adapters
+
+High-level flow:
+
+AI / UI / Button → Intent JSON → Kivai (validate + auth + route) → Adapter → Device → ACK + audit log
 
 ---
 
 ## 4. Core Functional Elements
 
-- Product registry and record management
-- Version-controlled documentation workflows
-- Licensing readiness tracking and export support
-- Role-based access for contributors and reviewers
+- Canonical Intent JSON schema (contract-first)
+- Schema validation and normalization
+- Authorization and policy enforcement
+- Routing to device adapters (protocol/device agnostic)
+- Deterministic execution acknowledgements (execution_id)
+- Audit logging and traceability
 
 ---
 
@@ -47,11 +76,12 @@ Kivai is a platform/software system that provides structured product registry, d
 
 Primary users:
 
-- Tech4Life product teams
-- Licensing managers
-- External collaborators and partners
+- Tech4Life product teams and creators building connected products
+- Integration partners (manufacturers / device ecosystems)
+- Developers building adapters and gateways
+- Operators deploying Kivai as a local gateway (e.g., Raspberry Pi / router)
 
-Primary benefit: consistent governance of products and licensing in a single, transparent platform.
+Primary benefit: a single, structured interoperability layer that makes device control consistent, secure, and scalable.
 
 ---
 
@@ -60,7 +90,7 @@ Primary benefit: consistent governance of products and licensing in a single, tr
 Kivai:
 
 - Does not intentionally harm humans, animals, or ecosystems
-- Supports transparent, ethical licensing and collaboration
+- Enforces authorization and traceability as safety mechanisms
 - Avoids manipulative or extractive mechanisms
 - Aligns with Tech4Life & Beyond ethical framework
 

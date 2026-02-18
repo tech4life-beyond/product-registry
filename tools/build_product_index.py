@@ -129,7 +129,9 @@ def _normalize_product(row: Dict[str, str]) -> Dict[str, object]:
     if aliases:
         item["aliases"] = aliases
 
-    legacy_ids = _split_list(row.get("Legacy IDs (Optional)", "") or row.get("Legacy IDs", ""))
+    legacy_ids = _split_list(
+        row.get("Legacy IDs (Optional)", "") or row.get("Legacy IDs", "")
+    )
     if legacy_ids:
         item["legacy_ids"] = legacy_ids
 
