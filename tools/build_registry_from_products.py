@@ -13,8 +13,8 @@ Typical use:
   python3 tools/build_registry_from_products.py --products ../products
 
 Outputs:
-  - exports/product_index.json            (legacy)
-  - exports/product_index_v1.json         (schema v1)
+  - exports/product_index.json                 (legacy)
+  - exports/product_index_v1.json              (schema v1)
   - exports/products_candidate_index_table.md  (candidate table for reviewers)
 """
 
@@ -32,7 +32,6 @@ from typing import Dict, List, Optional
 ROOT = Path(__file__).resolve().parents[1]
 EXPORTS = ROOT / "exports"
 RECORDS = ROOT / "records"
-
 
 # Strict, anchored TOIL id pattern used across the registry.
 TOIL_ID_RE = re.compile(r"\bT4L-TOIL-\d{3}(?:-[A-Z0-9]+)+\b")
@@ -67,21 +66,84 @@ def _extract_toil_id_from_readme(readme_text: str, repo_path: Path) -> str:
 
 
 def _split_csv(cell: str) -> Optional[List[str]]:
-    parts = [p.strip() for p in cell.split(",") if p.strip()]
+    parts = [p.strip() for p in (cell or "").split(",") if p.strip()]
     return parts or None
+
+
+def _extract_readme_metadata(readme_text: str) -> Dict[str, str]:
+    """Best-effort metadata extraction from README.md.
+
+    Conservative rules:
+    - We only extract when we find explicit key/value patterns.
+    - We do not invent values.
+    - Placeholders like TBD/N/A/Unknown are ignored.
+
+    Supported keys (case-insensitive):
+      - product_name, status, license_state, category, lead_creator, aliases, legacy_ids
+
+    Supported line styles:
+      - **Product Name:** Clean Drain Device
+      - Product Name: Clean Drain Device
+      - - Product Name: Clean Drain Device
+    """
+    key_map = {
+        "product name": "product_name",
+        "product_name": "product_name",
+        "status": "status",
+        "license state": "license_state",
+        "license_state": "license_state",
+        "category": "category",
+        "lead creator": "lead_creator",
+        "lead_creator": "lead_creator",
+        "aliases": "aliases",
+        "legacy ids": "legacy_ids",
+        "legacy_ids": "legacy_ids",
+    }
+
+    meta: Dict[str, str] = {}
+
+    line_re = re.compile(
+        r"^\s*(?:[-*]\s*)?(?:\*\*)?(?P<key>[A-Za-z _]+?)(?:\*\*)?\s*:\s*(?P<val>.+?)\s*$",
+        re.IGNORECASE | re.MULTILINE,
+    )
+
+    for m in line_re.finditer(readme_text):
+        raw_key = (m.group("key") or "").strip().lower()
+        raw_val = (m.group("val") or "").strip()
+        if not raw_key or not raw_val:
+            continue
+
+        norm_key = key_map.get(raw_key)
+        if not norm_key:
+            continue
+
+        if norm_key in meta:
+            continue
+
+        if raw_val.lower() in {"tbd", "n/a", "na", "none", "unknown", "-"}:
+            continue
+
+        meta[norm_key] = raw_val
+
+    return meta
 
 
 def _load_pack_metadata(repo_path: Path) -> Dict[str, str]:
     """Best-effort metadata extraction.
 
-    We keep this intentionally conservative: if a field is missing, we don't invent it.
+    Priority:
+      1) metadata.json (if present and valid)
+      2) README.md key/value fields (fills missing keys)
+
+    Conservative: missing fields remain missing.
     """
     meta: Dict[str, str] = {}
-    # If the product pack has a metadata file, prefer it. Otherwise fall back to README headings.
+
     md = repo_path / "metadata.json"
     if md.exists():
         try:
             meta_json = json.loads(_read_text(md))
+
             for k in (
                 "product_name",
                 "status",
@@ -104,9 +166,17 @@ def _load_pack_metadata(repo_path: Path) -> Dict[str, str]:
                 isinstance(v, str) and v.strip() for v in legacy_ids
             ):
                 meta["legacy_ids"] = ",".join(v.strip() for v in legacy_ids)
+
         except Exception:
             # non-fatal; continue with README-based extraction
             pass
+
+    readme = repo_path / "README.md"
+    if readme.exists():
+        readme_meta = _extract_readme_metadata(_read_text(readme))
+        for k, v in readme_meta.items():
+            if k not in meta and isinstance(v, str) and v.strip():
+                meta[k] = v.strip()
 
     return meta
 
@@ -116,9 +186,11 @@ def _candidate_from_pack(pack_path: Path) -> ProductCandidate:
     if not readme.exists():
         raise SystemExit(f"ERROR: Missing README.md in product pack: {pack_path}")
 
-    toil_id = _extract_toil_id_from_readme(_read_text(readme), pack_path)
+    readme_text = _read_text(readme)
+    toil_id = _extract_toil_id_from_readme(readme_text, pack_path)
     meta = _load_pack_metadata(pack_path)
 
+    # Conservative defaults (only used if metadata is missing)
     product_name = meta.get("product_name") or pack_path.name
     status = meta.get("status") or "Active"
     license_state = meta.get("license_state") or "Open for Licensing"
@@ -138,8 +210,7 @@ def _candidate_from_pack(pack_path: Path) -> ProductCandidate:
 
 
 def _discover_product_packs(products_root: Path) -> List[Path]:
-    # A "product pack" is a folder with a README.md at its root.
-    packs = []
+    packs: List[Path] = []
     for p in sorted(products_root.iterdir()):
         if p.is_dir() and (p / "README.md").exists():
             packs.append(p)
@@ -210,7 +281,7 @@ def _write_exports(candidates: List[ProductCandidate]) -> None:
 
 def _write_candidate_table(candidates: List[ProductCandidate]) -> None:
     out = EXPORTS / "products_candidate_index_table.md"
-    lines = []
+    lines: List[str] = []
     lines.append("# Candidate Product Index Table (from products repo)")
     lines.append("")
     lines.append(
@@ -269,7 +340,6 @@ def main(argv: Optional[List[str]] = None) -> int:
     _check_duplicate_toil_ids(candidates)
     _ensure_records_exist(candidates)
 
-    # Write to a temp area first when in --check mode.
     if args.check:
         import tempfile
 
